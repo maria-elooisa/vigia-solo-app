@@ -18,7 +18,7 @@ export default function Routes() {
         <Stack.Screen name="DataInput" component={DataInputScreen} />
         <Stack.Screen name="RiskView" component={RiskViewScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
-        <Stack.Screen name="MitigationActions" component={MitigationActionsScreen} />
+        <Stack.Screen name="Mitigation" component={MitigationActionsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
