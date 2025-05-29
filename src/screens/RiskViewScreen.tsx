@@ -25,24 +25,62 @@ const VisualizarRiscosScreen = ({ navigation }) => {
     fetchData();
   }, []);
 
-  // Obter labels (datas únicas ordenadas)
-  const getDates = () => {
-    const dates = [...new Set(data.map((item) => item.date))];
-    return dates.sort();
+  // Função para agrupar e calcular média por dia para uma região (ou todas as regiões)
+  const agruparMediaPorDia = (dados, region = null) => {
+    const agrupados = {};
+
+    dados.forEach(({ date, region: reg, soilMoisture, terrainInclination }) => {
+      if (region && reg !== region) return;
+
+      // Extrai só a parte da data (ano-mês-dia)
+      const dia = date.split('T')[0];
+
+      if (!agrupados[dia]) {
+        agrupados[dia] = { soilMoistureSoma: 0, terrainInclinationSoma: 0, count: 0 };
+      }
+
+      agrupados[dia].soilMoistureSoma += parseFloat(soilMoisture);
+      agrupados[dia].terrainInclinationSoma += parseFloat(terrainInclination);
+      agrupados[dia].count += 1;
+    });
+
+    const resultado = Object.entries(agrupados)
+      .map(([dia, valores]) => ({
+        dia,
+        soilMoistureMedia: valores.soilMoistureSoma / valores.count,
+        terrainInclinationMedia: valores.terrainInclinationSoma / valores.count,
+      }))
+      .sort((a, b) => new Date(a.dia) - new Date(b.dia));
+
+    return resultado;
   };
 
-  const dates = getDates();
+  // Função para criar a lista única e ordenada de todas as datas entre todas as regiões
+  const obterTodasDatas = () => {
+    const diasSet = new Set();
 
-  // Quando sem filtro: gráfico com linhas de umidade por região
+    regions.forEach((region) => {
+      const dadosAgrupados = agruparMediaPorDia(data, region);
+      dadosAgrupados.forEach(({ dia }) => diasSet.add(dia));
+    });
+
+    return Array.from(diasSet).sort((a, b) => new Date(a) - new Date(b));
+  };
+
+  const allDates = obterTodasDatas();
+
   const getChartDataByRegion = () => {
     const datasets = regions.map((region, idx) => {
-      const regionData = dates.map((date) => {
-        const item = data.find((d) => d.region === region && d.date === date);
-        return item ? parseFloat(item.soilMoisture) : 0;
+      const dadosAgrupados = agruparMediaPorDia(data, region);
+
+      // Mapear dados para os dias gerais, colocando 0 se não tiver dado naquele dia
+      const soilMoisturePorDia = allDates.map((dia) => {
+        const entry = dadosAgrupados.find((d) => d.dia === dia);
+        return entry ? entry.soilMoistureMedia : 0;
       });
 
       return {
-        data: regionData,
+        data: soilMoisturePorDia,
         color: () => `hsl(${(idx * 60) % 360}, 70%, 50%)`,
         strokeWidth: 2,
         name: region,
@@ -50,52 +88,46 @@ const VisualizarRiscosScreen = ({ navigation }) => {
     });
 
     return {
-      labels: dates,
+      labels: allDates,
       datasets,
-      legend: regions,
     };
   };
 
-  // Quando filtrado: gráfico com umidade e inclinação no tempo
   const getChartDataByRegionFiltered = () => {
-    const regionData = dates.map((date) => {
-      const item = data.find((d) => d.region === selectedRegion && d.date === date);
-      return item ? parseFloat(item.soilMoisture) : 0;
-    });
-
-    const inclineData = dates.map((date) => {
-      const item = data.find((d) => d.region === selectedRegion && d.date === date);
-      return item ? parseFloat(item.terrainInclination) : 0;
-    });
+    const dadosAgrupados = agruparMediaPorDia(data, selectedRegion);
 
     return {
-      labels: dates,
+      labels: dadosAgrupados.map((d) => d.dia),
       datasets: [
         {
-          data: regionData,
+          data: dadosAgrupados.map((d) => d.soilMoistureMedia),
           color: () => '#1976D2',
           strokeWidth: 2,
           name: 'Umidade (%)',
         },
         {
-          data: inclineData,
+          data: dadosAgrupados.map((d) => d.terrainInclinationMedia),
           color: () => '#64B5F6',
           strokeWidth: 2,
           name: 'Inclinação (°)',
         },
       ],
-      legend: ['Umidade (%)', 'Inclinação (°)'],
     };
   };
 
-  // Definir nível de risco pela última leitura
-  const lastData = data.filter((d) => d.region === selectedRegion).sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  const lastData = data
+    .filter((d) => d.region === selectedRegion)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
   const riskLevel =
     lastData && (lastData.soilMoisture > 70 || lastData.terrainInclination > 30)
       ? '⚠️ ALTO'
       : lastData
       ? '✅ OK'
       : '–';
+
+  const riskColor =
+    riskLevel === '⚠️ ALTO' ? '#D32F2F' : riskLevel === '✅ OK' ? '#1976D2' : '#1976D2';
 
   const chartConfig = {
     backgroundGradientFrom: '#fff',
@@ -128,34 +160,71 @@ const VisualizarRiscosScreen = ({ navigation }) => {
         </Picker>
       </View>
 
+      <Text style={[styles.riskText, { color: riskColor }]}>
+        Risco Atual: {riskLevel}
+      </Text>
+
       <Text style={styles.subTitle}>
         {selectedRegion ? `Dados de ${selectedRegion}` : 'Umidade por Região'}
       </Text>
 
-      {dates.length > 0 && (
+      {(selectedRegion === '' ? allDates.length > 0 : data.length > 0) && (
         <LineChart
           data={
-            selectedRegion === ''
-              ? getChartDataByRegion()
-              : getChartDataByRegionFiltered()
+            selectedRegion === '' ? getChartDataByRegion() : getChartDataByRegionFiltered()
           }
           width={screenWidth - 40}
           height={300}
           chartConfig={chartConfig}
           bezier
+          formatXLabel={(label) => {
+            if (!label) return '';
+            const parts = label.split('-');
+            if (parts.length !== 3) return label;
+            const [year, month, day] = parts;
+            return `${day}/${month}`;
+          }}
+          withInnerLines={false}
+          verticalLabelRotation={45}
         />
       )}
 
-      {selectedRegion !== '' && (
-        <>
-          <Text style={styles.riskText}>Risco Atual: {riskLevel}</Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => navigation.navigate('Mitigation')}
-          >
-            <Text style={styles.buttonText}>Mitigar Riscos</Text>
-          </TouchableOpacity>
-        </>
+      {/* Legenda separada e organizada */}
+      <View style={styles.legendContainer}>
+        {selectedRegion === ''
+          ? regions.map((region, idx) => (
+              <Text
+                key={idx}
+                style={{
+                  color: `hsl(${(idx * 60) % 360}, 70%, 50%)`,
+                  fontSize: 14,
+                  marginVertical: 2,
+                }}
+              >
+                ● {region}
+              </Text>
+            ))
+          : ['Umidade (%)', 'Inclinação (°)'].map((label, idx) => (
+              <Text
+                key={idx}
+                style={{
+                  color: idx === 0 ? '#1976D2' : '#64B5F6',
+                  fontSize: 14,
+                  marginVertical: 2,
+                }}
+              >
+                ● {label}
+              </Text>
+            ))}
+      </View>
+
+      {selectedRegion !== '' && riskLevel === '⚠️ ALTO' && (
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate('Mitigation')}
+        >
+          <Text style={styles.buttonText}>Mitigar Riscos</Text>
+        </TouchableOpacity>
       )}
     </ScrollView>
   );
@@ -192,17 +261,16 @@ const styles = StyleSheet.create({
   subTitle: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 12,
+    marginVertical: 12,
     color: '#1976D2',
   },
   riskText: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 20,
-    color: '#D32F2F',
+    marginBottom: 5,
   },
   button: {
-    backgroundColor: '#1976D2',
+    backgroundColor: '#00416d',
     padding: 14,
     borderRadius: 8,
     marginTop: 20,
@@ -211,5 +279,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     fontSize: 16,
+  },
+  legendContainer: {
+    marginTop: 20,
+    flexDirection: 'column',
+    flexWrap: 'wrap',
   },
 });

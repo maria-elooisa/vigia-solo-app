@@ -27,7 +27,7 @@ const DataInputScreen = () => {
       soilMoisture,
       terrainInclination,
       region: selectedRegion,
-      date: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR'),
+      date: new Date().toISOString()
     };
 
     await saveEnvironmentalData(newData);
