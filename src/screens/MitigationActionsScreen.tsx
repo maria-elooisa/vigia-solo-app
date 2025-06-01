@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
@@ -6,6 +6,18 @@ import { useNavigation } from '@react-navigation/native';
 
 export default function MitigationActionsScreen() {
   const navigation = useNavigation();
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollToEnd({ animated: true });
+      }
+    }, 2000); // 2 segundos de delay
+
+    // Limpar o timeout se a tela for desmontada antes
+    return () => clearTimeout(timeout);
+  }, []);
 
   const actions = [
     {
@@ -35,15 +47,18 @@ export default function MitigationActionsScreen() {
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Ações de Mitigação</Text>
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
       <Text style={styles.subTitle}>Sugestões para reduzir riscos detectados</Text>
 
       <View style={styles.alertBox}>
         <Ionicons name="warning-outline" size={24} color="#E63946" />
         <Text style={styles.alertText}>
-          Caso você esteja em área próxima a morros ou encostas, entre em contato com os órgãos competentes da sua cidade. 
-          Em caso de risco iminente ou fortes chuvas, procure abrigo em local seguro imediatamente.
+          Caso você esteja em área próxima a morros, entre em contato com os órgãos competentes da sua cidade. 
+          Em caso de risco iminente, procure abrigo em local seguro imediatamente.
         </Text>
       </View>
 
@@ -70,72 +85,72 @@ export default function MitigationActionsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: 14,
     backgroundColor: theme.colors.background,
-    flexGrow: 1,
+    paddingBottom: 20,
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: theme.colors.primary,
-    marginBottom: 10,
     textAlign: 'center',
+    marginBottom: 8,
   },
   subTitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: theme.colors.text,
-    marginBottom: 20,
     textAlign: 'center',
+    marginBottom: 15,
   },
   alertBox: {
     flexDirection: 'row',
     backgroundColor: '#FFE5E5',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
     alignItems: 'flex-start',
   },
   alertText: {
     color: '#E63946',
-    fontSize: 14,
-    marginLeft: 10,
+    fontSize: 12,
+    marginLeft: 8,
     flex: 1,
   },
   card: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: theme.colors.white,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    elevation: 2,
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    elevation: 1,
   },
   cardText: {
-    marginLeft: 15,
+    marginLeft: 12,
     flex: 1,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.colors.primary,
-    marginBottom: 5,
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: theme.colors.text,
   },
   button: {
     flexDirection: 'row',
     backgroundColor: theme.colors.primary,
-    padding: 15,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 30,
+    marginTop: 0, // deixa mais próximo dos cards
   },
+  
   buttonText: {
     color: theme.colors.white,
-    fontSize: 16,
-    marginLeft: 8,
+    fontSize: 14,
+    marginLeft: 6,
   },
 });
